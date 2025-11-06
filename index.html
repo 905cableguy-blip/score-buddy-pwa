@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Score Buddy - Simple Score Tracker</title>
+    
+    <!-- PWA REQUIRED LINKS -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="ScoreBuddy">
+    <!-- End PWA Links -->
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://kit.fontawesome.com/a84d41e7d0.js" crossorigin="anonymous"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@700;900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f9fc;
+            min-height: 100vh; /* Ensures full height for landscape calculation */
+            margin: 0;
+            padding: 0;
+        }
+        
+        /* Default Portrait/Desktop Styles */
+        #app {
+            max-width: 42rem; /* Retain max-width for desktop/portrait */
+            margin: 0 auto;
+        }
+
+        .score-button {
+            transition: transform 0.1s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .score-button:active {
+            transform: scale(0.98);
+        }
+        .tappable-score {
+            transition: transform 0.1s ease;
+            cursor: pointer;
+        }
+        .tappable-score:active {
+            transform: scale(0.95);
+        }
+        .time-button {
+            @apply text-xs px-2 py-1 rounded-full font-bold transition duration-150;
+        }
+
+        /* Style for the Set Times table */
+        #set-tracker-table th, #set-tracker-table td {
+            @apply p-2 text-center border-b border-gray-200;
+        }
+        #set-tracker-table th {
+            @apply text-xs font-semibold uppercase text-gray-500 bg-gray-50;
+        }
+        #set-tracker-table .set-number {
+             @apply font-bold text-gray-800 text-sm;
+        }
+        /* Styling for the Total Set Length row */
+        #set-tracker-table .total-set-row td {
+            @apply font-black text-xs bg-indigo-50 text-indigo-700 border-b border-indigo-200;
+        }
+        /* Styling for the Total Match Length row */
+        #set-tracker-table .total-match-row td {
+            @apply font-extrabold text-sm bg-indigo-100 text-indigo-800 border-t-2 border-indigo-400;
+        }
+
+        /* --- LANDSCAPE/LOW-HEIGHT OPTIMIZATION (No Scrolling Mandate) --- */
+        @media (orientation: landscape) and (max-height: 800px) { 
+            body { 
+                overflow: hidden !important; /* Crucial: ensures no scrolling */
+            }
+            #app {
+                max-width: none;
+                width: 100vw;
+                height: 100vh;
+                margin: 0;
+                padding: 0;
+                display: flex; 
+                flex-direction: column;
+            }
+            
+            /* Hide non-essential vertical elements */
+            header, #reset-button-container { display: none !important; }
+
+            /* New 3-Column Layout Container */
+            #three-column-layout {
+                display: flex;
+                flex-direction: row;
+                flex-grow: 1; 
+                width: 100%;
+                margin: 0;
+                padding: 0;
+                align-items: stretch; 
+            }
+
+            /* Team A & B Columns (20% width) */
+            #team-a-col, #team-b-col {
+                width: 20%; 
+                background-color: #ffffff;
+                padding: 0.75rem 0.25rem; /* Increased vertical padding */
+                display: flex;
+                flex-direction: column;
+                justify-content: space-evenly; /* Spread elements out vertically */
+                align-items: center;
+                text-align: center;
+                border-radius: 0;
+            }
+
+            /* Score Display Shrinkage */
+            .score-title { 
+                font-size: 0.75rem !important; 
+                margin-bottom: 0.25rem !important;
+            }
+            #scoreA, #scoreB { 
+                font-size: 3rem !important; 
+                line-height: 1;
+                margin-bottom: 0.5rem !important;
+            }
+            .score-button { 
+                font-size: 0.6rem !important; 
+                width: 60px !important;
+                padding: 0.1rem 0.2rem !important;
+                margin-top: 0.25rem !important;
+                box-shadow: none;
+            }
+            
+            /* Center Set Tracker Table Column (60% width) */
+            #set-tracker-col {
+                width: 60%; 
+                padding: 0.5rem; /* Increased padding */
+                background-color: #f7f9fc;
+                display: flex;
+                flex-direction: column;
+                overflow-y: hidden; 
+            }
+            
+            #set-tracker-container {
+                flex-grow: 1;
+                padding: 0.25rem !important;
+                margin: 0 !important;
+                box-shadow: none;
+                border-radius: 0;
+                background-color: transparent;
+            }
+
+            /* Table specific shrinkage */
+            .set-tracker-header {
+                 font-size: 0.75rem !important; 
+                 padding-bottom: 0.2rem !important;
+            }
+
+            #set-tracker-table {
+                font-size: 0.6rem !important; 
+                table-layout: fixed;
+                border-collapse: collapse;
+                flex-grow: 1;
+            }
+            
+            #set-tracker-table th, #set-tracker-table td {
+                padding: 0.3rem !important; /* Increased vertical padding to spread rows */
+                height: auto;
+                line-height: 1.2; /* Slightly increased line height for readability */
+                vertical-align: middle;
+            }
+
+            #set-tracker-table .set-number {
+                font-size: 0.7rem;
+            }
+            
+            .time-button {
+                font-size: 0.5rem !important; 
+                padding: 0 0.1rem !important;
+                min-width: 40px;
+                margin-top: 0.1rem !important;
+            }
+
+             /* Total rows shrinkage */
+            #set-tracker-table .total-set-row td,
+            #set-tracker-table .total-match-row td {
+                padding: 0.3rem 0.5rem !important;
+                font-size: 0.6rem !important;
+            }
+        }
+    </style>
+</head>
+<body class="pb-20">
+
+    <div id="app" class="max-w-xl mx-auto">
+        <header class="text-center pt-8 pb-4 relative">
+            <!-- Title with Info Button (Hidden in landscape) -->
+            <div class="inline-flex items-center justify-center">
+                <h1 class="text-3xl font-black text-gray-900">Score Buddy</h1>
+                <button onclick="window.toggleInstructions()" class="ml-2 text-gray-400 hover:text-indigo-600 transition duration-150 focus:outline-none" aria-label="Show instructions">
+                    <i class="fas fa-info-circle text-lg"></i>
+                </button>
+            </div>
+            <p class="text-sm text-gray-500 mt-2" id="user-info"></p>
+
+            <!-- Instructions Pop-out (Tooltip) -->
+            <div id="instructions-popup" class="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 p-3 bg-indigo-600 text-white text-sm font-medium rounded-lg shadow-xl hidden z-40 w-max max-w-[90%]" style="min-width: 200px;">
+                Tap the large score number to add **+1**.
+                <div class="absolute w-3 h-3 bg-indigo-600 transform rotate-45 -top-1 left-1/2 -translate-x-1/2"></div>
+            </div>
+        </header>
+
+        <!-- Main Content Wrapper: This container becomes the 3-column flex box in landscape -->
+        <div id="three-column-layout" class="flex flex-col mx-4 space-y-4 md:space-y-0 md:flex-row md:space-x-4">
+
+            <!-- 1. Team A Column (Left in Landscape, Top in Portrait) -->
+            <div id="team-a-col" class="bg-white p-6 rounded-xl shadow-lg w-full md:w-1/2 md:border-r md:border-gray-200">
+                <div class="flex flex-col items-center">
+                    <h2 class="score-title text-xl font-bold text-indigo-600 mb-4">Team A</h2>
+                    <!-- Tappable Score: Tap to score +1 -->
+                    <span id="scoreA" onclick="window.updateScore('A', 1)" class="tappable-score text-8xl font-black text-gray-900 min-w-[50px]">0</span>
+                    <!-- Minus Button (Underneath) -->
+                    <button onclick="window.updateScore('A', -1)" class="score-button bg-red-500 hover:bg-red-600 text-white text-base w-20 py-1 rounded-full flex items-center justify-center font-semibold mt-6">Undo (-1)</button>
+                </div>
+            </div>
+            
+            <!-- 2. Set Tracker Table Column (Center in Landscape, Middle in Portrait) -->
+            <div id="set-tracker-col" class="bg-white p-0 rounded-xl shadow-lg w-full md:w-full">
+                <div id="set-tracker-container" class="p-6 pt-4 w-full">
+                    <h3 class="set-tracker-header text-lg font-bold text-gray-800 mb-3 border-b pb-2">Set Time Tracker</h3>
+                    <table id="set-tracker-table" class="w-full border-collapse">
+                        <thead>
+                            <tr>
+                                <th class="w-1/4">Set & Score</th>
+                                <th class="w-1/4">Start</th>
+                                <th class="w-1/4">End</th>
+                                <th class="w-1/4">Duration</th>
+                            </tr>
+                        </thead>
+                        <tbody id="set-tracker-body">
+                            <!-- Rows will be injected here by renderUI() -->
+                        </tbody>
+                        <tfoot id="set-tracker-footer">
+                            <!-- Footer rows will be injected here by renderUI() -->
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 3. Team B Column (Right in Landscape, Bottom in Portrait) -->
+            <div id="team-b-col" class="bg-white p-6 rounded-xl shadow-lg w-full md:w-1/2">
+                <div class="flex flex-col items-center">
+                    <h2 class="score-title text-xl font-bold text-teal-600 mb-4">Team B</h2>
+                    <!-- Tappable Score: Tap to score +1 -->
+                    <span id="scoreB" onclick="window.updateScore('B', 1)" class="tappable-score text-8xl font-black text-gray-900 min-w-[50px]">0</span>
+                    <!-- Minus Button (Underneath) -->
+                    <button onclick="window.updateScore('B', -1)" class="score-button bg-red-500 hover:bg-red-600 text-white text-base w-20 py-1 rounded-full flex items-center justify-center font-semibold mt-6">Undo (-1)</button>
+                </div>
+            </div>
+
+        </div>
+        <!-- End Main Content Wrapper -->
+        
+        <!-- Reset Button (Hidden in landscape) -->
+        <div id="reset-button-container" class="mt-8 text-center p-4">
+            <button onclick="window.resetScore()" class="score-button reset-button-custom bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 px-6 rounded-xl transition duration-150 ease-in-out shadow-lg text-lg">
+                <i class="fas fa-undo mr-2"></i> Reset Score & Times
+            </button>
+        </div>
+        
+        <!-- Error/Status Message -->
+        <div id="status-message" class="fixed bottom-4 left-1/2 transform -translate-x-1/2 p-3 border rounded-xl z-50 min-w-[300px] text-center hidden" role="alert"></div>
+
+    </div>
+
+    <!-- Firebase SDK Imports -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, onSnapshot, setDoc, getDoc, runTransaction } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Global Firebase Vars (MUST be defined as per instructions)
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        let db;
+        let auth;
+        let scoreDocRef;
+        let currentUserId = null;
+        let isAuthReady = false;
+
+        // --- Core App State (Simplified) ---
+        // Function to create a clean, new set object
+        const createCleanSet = () => ({ start: null, end: null, scoreA: null, scoreB: null });
+        
+        // Use a function to ensure all 5 sets are distinct objects
+        const getInitialSetTimes = () => Array.from({ length: 5 }, () => createCleanSet());
+
+        const INITIAL_STATE = {
+            teamAScore: 0,
+            teamBScore: 0,
+            setTimes: getInitialSetTimes(),
+        };
+        let matchState = JSON.parse(JSON.stringify(INITIAL_STATE)); // Deep copy
+
+        // --- Utility to ensure safe array state ---
+        const getSafeSetTimes = (setTimesData) => {
+            const base = Array.isArray(setTimesData) ? setTimesData.slice(0, 5) : [];
+            while (base.length < 5) {
+                 base.push(createCleanSet()); // Ensures we always add a new, distinct object
+            }
+            // Map to deep copy objects and ensure structure
+            return base.map(set => ({
+                start: set.start || null,
+                end: set.end || null,
+                scoreA: set.scoreA === undefined || set.scoreA === null ? null : set.scoreA,
+                scoreB: set.scoreB === undefined || set.scoreB === null ? null : set.scoreB,
+            }));
+        };
+
+        // --- Helper Functions ---
+        const formatTimeDisplay = (timestamp) => {
+            if (!timestamp) return '--:--';
+            const date = new Date(timestamp);
+            const hours = date.getHours();
+            const minutes = date.getMinutes();
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            const displayHours = hours % 12 || 12; // 12-hour format
+            const displayMinutes = minutes < 10 ? '0' + minutes : minutes;
+            return `${displayHours}:${displayMinutes} ${ampm}`;
+        };
+
+        const calculateDuration = (start, end) => {
+            if (!start || !end) return '-- min';
+            if (end < start) return 'Error';
+            const diffMs = end - start;
+            const diffMinutes = Math.floor(diffMs / (1000 * 60));
+            return `${diffMinutes} min`;
+        };
+
+        const getDurationInMinutes = (start, end) => {
+             if (!start || !end || end < start) return 0;
+             return Math.floor((end - start) / (1000 * 60));
+        }
+
+        const showStatusMessage = (message, classes) => {
+            const statusEl = document.getElementById('status-message');
+            statusEl.textContent = message;
+            statusEl.className = `fixed bottom-4 left-1/2 transform -translate-x-1/2 p-3 border rounded-xl z-50 min-w-[300px] text-center ${classes}`;
+            statusEl.classList.remove('hidden');
+            setTimeout(() => statusEl.classList.add('hidden'), 4000);
+        };
+        
+        // --- Firebase Initialization and Auth ---
+
+        const initializeFirebase = async () => {
+            try {
+                if (Object.keys(firebaseConfig).length === 0) {
+                    throw new Error("Firebase configuration is missing.");
+                }
+
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                // 1. Authenticate
+                await new Promise(resolve => {
+                    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+                        unsubscribe(); 
+                        if (user) {
+                            currentUserId = user.uid;
+                        } else {
+                            if (initialAuthToken) {
+                                await signInWithCustomToken(auth, initialAuthToken);
+                            } else {
+                                await signInAnonymously(auth);
+                            }
+                            currentUserId = auth.currentUser.uid;
+                        }
+                        isAuthReady = true;
+                        resolve();
+                    });
+                });
+
+                // 2. Setup Firestore Listener (Public Data)
+                const matchId = 'simple-score-buddy-tracker-v1'; // New ID for simple score state
+                scoreDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'scores', matchId);
+
+                const docSnap = await getDoc(scoreDocRef);
+                // If the document doesn't exist, initialize it.
+                if (!docSnap.exists()) {
+                    await setDoc(scoreDocRef, INITIAL_STATE);
+                }
+
+                // 3. Attach Real-Time Listener
+                onSnapshot(scoreDocRef, (doc) => {
+                    if (doc.exists()) {
+                        const data = doc.data();
+                        
+                        // Load scores
+                        matchState.teamAScore = data.teamAScore || 0;
+                        matchState.teamBScore = data.teamBScore || 0;
+                        
+                        // Use safe utility to load set times
+                        matchState.setTimes = getSafeSetTimes(data.setTimes);
+                        
+                        renderUI();
+                    }
+                }, (error) => {
+                    console.error("Firestore listen failed:", error);
+                    showStatusMessage(`Error loading score data: ${error.message}`, 'bg-red-100 border-red-400 text-red-700');
+                });
+            } catch (error) {
+                console.error("Firebase initialization failed:", error);
+                showStatusMessage(`Initialization failed: ${error.message}`, 'bg-red-100 border-red-400 text-red-700');
+            }
+        };
+
+        // --- UI Interactions ---
+        window.toggleInstructions = () => {
+            const popup = document.getElementById('instructions-popup');
+            popup.classList.toggle('hidden');
+        };
+
+        // Close instructions when clicking anywhere else
+        document.addEventListener('click', (event) => {
+            const popup = document.getElementById('instructions-popup');
+            const button = document.querySelector('[aria-label="Show instructions"]');
+            
+            // Check if the click is outside the popup AND outside the button
+            if (popup && button && !popup.classList.contains('hidden') && !popup.contains(event.target) && !button.contains(event.target)) {
+                popup.classList.add('hidden');
+            }
+        });
+
+        // --- UI Rendering ---
+
+        const renderSetTracker = () => {
+            const body = document.getElementById('set-tracker-body');
+            const footer = document.getElementById('set-tracker-footer');
+            body.innerHTML = '';
+            footer.innerHTML = '';
+
+            let totalSetDurationMinutes = 0;
+            const setTimes = matchState.setTimes;
+
+            // Render individual set rows
+            setTimes.forEach((set, index) => {
+                const setNum = index + 1;
+                const duration = getDurationInMinutes(set.start, set.end);
+                totalSetDurationMinutes += duration;
+
+                const row = document.createElement('tr');
+                
+                // Determine score display for the first column
+                const scoreDisplay = (set.scoreA !== null && set.scoreB !== null)
+                    ? `<span class="text-xs text-gray-500 font-medium block mt-1">${set.scoreA}-${set.scoreB}</span>`
+                    : '';
+
+                // Column 1: Set Number and Score
+                row.innerHTML += `<td class="set-number">
+                    Set ${setNum}
+                    ${scoreDisplay}
+                </td>`;
+                
+                // Column 2: Start Time
+                row.innerHTML += `
+                    <td>
+                        <span id="set-${setNum}-start-display">${formatTimeDisplay(set.start)}</span>
+                        <button onclick="window.recordSetTime(${index}, 'start')" class="time-button bg-green-100 text-green-600 hover:bg-green-200 block mx-auto mt-1">
+                            ${set.start ? 'Upd' : 'Start'}
+                        </button>
+                    </td>
+                `;
+
+                // Column 3: End Time (and trigger score capture)
+                const isStartRecorded = !!set.start;
+                row.innerHTML += `
+                    <td>
+                        <span id="set-${setNum}-end-display">${formatTimeDisplay(set.end)}</span>
+                        <button onclick="window.recordSetTime(${index}, 'end')" class="time-button bg-red-100 text-red-600 hover:bg-red-200 block mx-auto mt-1" ${!isStartRecorded ? 'disabled' : ''}>
+                             ${set.end ? 'Upd' : 'End'}
+                        </button>
+                    </td>
+                `;
+
+                // Column 4: Duration (Calculated)
+                row.innerHTML += `<td class="font-semibold text-gray-700">${calculateDuration(set.start, set.end)}</td>`;
+
+                body.appendChild(row);
+            });
+
+            // --- 1. Total Set Length Row (Sum of all sets played) ---
+            const totalSetRow = document.createElement('tr');
+            totalSetRow.classList.add('total-set-row');
+            totalSetRow.innerHTML = `
+                <td colspan="3" class="text-left pl-2 py-1">Total Set Time</td>
+                <td class="py-1">${totalSetDurationMinutes} min</td>
+            `;
+            footer.appendChild(totalSetRow);
+
+            // --- 2. Calculate Total Match Length (Start of Set 1 to LAST End Time) ---
+            const matchStartTime = setTimes[0].start; // Start of Set 1
+            let finalEndTime = null;
+
+            // Iterate backwards to find the last recorded 'end' time
+            for (let i = setTimes.length - 1; i >= 0; i--) {
+                if (setTimes[i].end) {
+                    finalEndTime = setTimes[i].end;
+                    break; 
+                }
+            }
+
+            let totalMatchDurationDisplay = '-- min';
+
+            if (matchStartTime && finalEndTime) {
+                const matchDurationMinutes = getDurationInMinutes(matchStartTime, finalEndTime);
+                totalMatchDurationDisplay = `${matchDurationMinutes} min`;
+            } else if (matchStartTime) {
+                 // If match started but hasn't ended (finalEndTime is null)
+                 totalMatchDurationDisplay = 'Ongoing...';
+            }
+
+
+            // --- 3. Total Match Length Row ---
+            const totalMatchRow = document.createElement('tr');
+            totalMatchRow.classList.add('total-match-row');
+            totalMatchRow.innerHTML = `
+                <td colspan="3" class="text-left pl-2 py-1">Total Match Time</td>
+                <td class="py-1">${totalMatchDurationDisplay}</td>
+            `;
+            footer.appendChild(totalMatchRow);
+        };
+
+        const renderUI = () => {
+            // Render Scores
+            document.getElementById('scoreA').textContent = matchState.teamAScore;
+            document.getElementById('scoreB').textContent = matchState.teamBScore;
+            
+            // Render Set Tracker Table
+            renderSetTracker();
+        };
+
+        // --- Firestore Actions ---
+
+        window.updateScore = async (team, adjustment) => {
+            if (!isAuthReady) return showStatusMessage("Please wait for authentication to load.", 'bg-yellow-100 border-yellow-400 text-yellow-700');
+
+            try {
+                await runTransaction(db, async (transaction) => {
+                    const scoreDoc = await transaction.get(scoreDocRef);
+                    if (!scoreDoc.exists()) throw "Score document does not exist!";
+                    
+                    const data = scoreDoc.data();
+                    let scoreA = data.teamAScore || 0;
+                    let scoreB = data.teamBScore || 0;
+
+                    if (team === 'A') {
+                        scoreA = Math.max(0, scoreA + adjustment); // Prevent negative scores
+                    } else if (team === 'B') {
+                        scoreB = Math.max(0, scoreB + adjustment); // Prevent negative scores
+                    }
+
+                    transaction.update(scoreDocRef, { teamAScore: scoreA, teamBScore: scoreB });
+                });
+            } catch (e) {
+                console.error("Score transaction failed:", e);
+                showStatusMessage("Failed to update score.", 'bg-red-100 border-red-400 text-red-700');
+            }
+        };
+
+        window.recordSetTime = async (setIndex, field) => {
+            if (!isAuthReady) return showStatusMessage("Please wait for authentication to load.", 'bg-yellow-100 border-yellow-400 text-yellow-700');
+            
+            const timestamp = Date.now();
+            
+            try {
+                await runTransaction(db, async (transaction) => {
+                    const scoreDoc = await transaction.get(scoreDocRef);
+                    if (!scoreDoc.exists()) throw "Score document does not exist!";
+                    
+                    const data = scoreDoc.data();
+                    // Use getSafeSetTimes to ensure array integrity before modifying
+                    let currentSetTimes = getSafeSetTimes(data.setTimes);
+                    
+                    // Check logic for 'end' time
+                    if (field === 'end' && !currentSetTimes[setIndex].start) {
+                        throw new Error("Cannot record End Time before Start Time.");
+                    }
+
+                    // 1. Update the specific time field
+                    currentSetTimes[setIndex][field] = timestamp;
+                    
+                    // 2. Additional logic for 'end' time: CAPTURE SCORE & AUTO-START NEXT SET
+                    if (field === 'end') {
+                        // Capture and save the current score for the set that just ended
+                        currentSetTimes[setIndex].scoreA = data.teamAScore || 0;
+                        currentSetTimes[setIndex].scoreB = data.teamBScore || 0;
+
+                        // Check if a next set is possible (sets 1 through 4)
+                        if (setIndex < 4) {
+                            const nextSetIndex = setIndex + 1;
+                            const threeMinutesInMs = 3 * 60 * 1000;
+                            const nextSetStartTime = timestamp + threeMinutesInMs;
+                            
+                            // Automatically set the next set's start time 3 minutes ahead
+                            currentSetTimes[nextSetIndex].start = nextSetStartTime;
+                            currentSetTimes[nextSetIndex].end = null;
+                            currentSetTimes[nextSetIndex].scoreA = null;
+                            currentSetTimes[nextSetIndex].scoreB = null;
+
+                            showStatusMessage(`Set ${setIndex + 1} ended and Set ${nextSetIndex + 1} automatically started 3 minutes ahead.`, 'bg-blue-100 border-blue-400 text-blue-700');
+                        } else {
+                            showStatusMessage(`Match finished! Final set (${setIndex + 1}) ended and score recorded.`, 'bg-blue-100 border-blue-400 text-blue-700');
+                        }
+                    } else {
+                        // Standard start time update
+                        showStatusMessage(`Start Time recorded for Set ${setIndex + 1}!`, 'bg-blue-100 border-blue-400 text-blue-700');
+                    }
+
+                    // Update the entire setTimes array in Firestore
+                    transaction.update(scoreDocRef, { setTimes: currentSetTimes });
+                });
+            } catch (e) {
+                console.error("Time transaction failed:", e);
+                showStatusMessage(`Failed to record time: ${e.message}`, 'bg-red-100 border-red-400 text-red-700');
+            }
+        }
+        
+        window.resetScore = async () => {
+            if (!isAuthReady) return showStatusMessage("Please wait for authentication to load.", 'bg-yellow-100 border-yellow-400 text-yellow-700');
+            
+            try {
+                // Generate a fresh set of initial times to ensure reset
+                const resetState = { ...INITIAL_STATE, setTimes: getInitialSetTimes() };
+                
+                // Use setDoc to overwrite the document with the initial state (0-0 and empty set times)
+                await setDoc(scoreDocRef, resetState);
+                showStatusMessage("Score and Set Times reset.", 'bg-green-100 border-green-400 text-green-700');
+            } catch (e) {
+                console.error("Reset transaction failed:", e);
+                showStatusMessage("Failed to reset score.", 'bg-red-100 border-red-400 text-red-700');
+            }
+        };
+
+        // Start the application
+        window.addEventListener('load', initializeFirebase);
+    </script>
+</body>
+</html>
+
